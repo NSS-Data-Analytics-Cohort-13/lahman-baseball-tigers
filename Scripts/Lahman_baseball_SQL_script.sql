@@ -4,6 +4,7 @@ ORDER BY year
 
 -------------------------------------------------------------------------------------------------
 --1. What range of years for baseball games played does the provided database cover? 
+--correct
 SELECT concat(MIN(yearid),'-',MAX(yearid))
 FROM appearances
 --ORDER BY yearid
@@ -71,7 +72,7 @@ SELECT
 	,	concat(people.namefirst, ' ', people.namelast) AS name
 	--,	SUM(appearances.g_all) as total_games
 	,	appearances.g_all
-	,	teams.name
+	,	teams.name as team_name
 FROM people
 	INNER JOIN appearances
 		USING(playerid)
@@ -131,7 +132,7 @@ ORDER BY total_salary DESC
 
 WITH highest_salaries AS (
 						SELECT 
-								SUM(salaries.salary)::INT::MONEY AS total_salary
+								SUM(DISTINCT salaries.salary)::INT::MONEY AS total_salary
 							,	salaries.playerid
 						FROM salaries
 						GROUP BY salaries.playerid
@@ -159,7 +160,7 @@ FROM highest_salaries
 	INNER JOIN vandy_players
 		ON collegeplaying.schoolid=vandy_players.schoolid
 ORDER BY total_salary DESC
-LIMIT 1;
+--LIMIT 1;
 ----------------------------------------
 SELECT
 		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
@@ -250,29 +251,249 @@ FROM avg
 --ROUND(AVG(batting.hr),2)
 --WHERE batting.year>FLOOR(1920/10)
 
+--correct
 SELECT 
-		ROUND(AVG(so),2)/g AS avg_so
+		ROUND(SUM(CAST(so AS numeric))/SUM(CAST(g AS numeric)),2) AS avg_so
 	,	(yearid/10)*10 AS decade
-	,	ROUND(AVG(batting.hr),2)/g AS avg_hr
-FROM batting
-WHERE yearid>1920
-GROUP BY decade, g
+	,	ROUND(SUM(CAST(hr AS numeric))/SUM(CAST(g AS numeric)),2) AS avg_hr
+FROM teams
+WHERE yearid>=1920
+GROUP BY decade
 ORDER by decade
--------------------------
-SELECT
-	(yearid/10)*10 AS decade
-,	ROUND(AVG(SO+SOA), 2)/g AS avg_strikeouts_game
-,	ROUND(AVG(HR+HRA), 2)/g AS avg_homeruns_game
-FROM teams
-WHERE yearid >= 1920
-GROUP BY
-	decade, g
-ORDER BY
-	avg_strikeouts_game
-,	avg_homeruns_game
 
-SELECT *
+-------------------------------------------------------------------------------------------------------------------------
+
+--6. Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
+--Correct
+
+SELECT ROUND((CAST(sb AS NUMERIC) / (CAST(sb+cs AS NUMERIC))),3) *100 || '%' AS percentage_success
+	,	CONCAT(namefirst,' ',namelast) AS full_name
+	, 	yearid
+	--,	sb
+	--,	cs
+FROM batting
+	inner join people
+		USING(playerid)
+WHERE yearid=2016 AND sb+cs>=20
+ORDER BY percentage_success DESC
+
+SELECT * FROM batting
+------------------------------------------
+SELECT ((SUM(sb) / (SUM(sb+cs)) *100 AS percentage_success
+	,	CONCAT(namefirst,' ',namelast) AS full_name
+	, 	yearid
+	--,	sb
+	--,	cs
+FROM batting
+	inner join people
+		USING(playerid)
+WHERE yearid=2016 AND sb>20
+ORDER BY percentage_success DESC
+------------------------------------
+SELECT (CAST (sb AS NUMERIC) / (CAST(sb+cs AS NUMERIC))) *100 AS percentage_success
+	,	CONCAT(namefirst,' ',namelast) AS full_name
+	, 	yearid
+	--,	sb
+	--,	cs
+FROM batting
+	inner join people
+		USING(playerid)
+WHERE yearid=2016 AND sb>20
+ORDER BY percentage_success DESC
+-------------------------------------------------------------------------------------------------------------
+
+--7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
+
+SELECT 	
+		yearid
+	,	teamid
+	,	MAX(w) AS max_wins
+	,	MIN(w) AS min_wins
+	,	CASE WHEN wswin='Y' THEN 'Winner'
+			 WHEN  wswin='N' THEN 'Loser' ELSE 'Didnt Make WS' END AS ws_win_loss
+
 FROM teams
+WHERE yearid BETWEEN 1970 AND 2016
+GROUP BY yearid, teamid, wswin
+ORDER BY max_wins DESC, min_wins ASC
+
+--2001	"SEA"	116	 "Loser"
+--1981	"LAN"	63	"Winner"	
+-------------------------------------------
+--i need to find the percentage also use a CTE too many rows
+
+WITH  wins_yes AS (SELECT --teamid,
+				max(w) AS max_wins_y
+				FROM teams
+				WHERE wswin='Y')
+				--GROUP BY teamid)
+				
+,     wins_min_yes AS (SELECT --teamid,
+				min(w) AS min_wins_y
+				FROM teams
+				WHERE wswin='Y')
+				--GROUP BY teamid)
+
+,         max_wins_no AS (SELECT --teamid,
+				max(w) AS max_wins_n
+				FROM teams
+				WHERE wswin='N')
+				--GROUP BY teamid)
+
+SELECT max_wins_y
+	,	min_wins_y
+	,	max_wins_n
+FROM wins_yes, wins_min_yes, max_wins_no
+FROM teams
+	INNER JOIN wins_yes
+		USING(teamid)
+			INNER JOIN wins_min_yes
+				USING(teamid)
+					INNER JOIN max_wins_no
+						USING(teamid)
+GROUP BY max_wins_y
+	,	min_wins_y
+	,	max_wins_n
+ORDER BY max_wins_y DESC
+	,	min_wins_y
+	,	max_wins_n 
+-----------------------------------------------------------
+SELECT 	
+		yearid
+	,	teamid
+	--,	MAX(w) AS max_wins
+	--,	MIN(w) AS min_wins
+	,	CASE WHEN wswin='Y' THEN 'Winner'
+			 WHEN  wswin='N' THEN 'Loser' ELSE 'Didnt Make WS' END AS ws_win_loss
+
+FROM teams
+WHERE yearid>=1970 AND yearid !=1981
+GROUP BY yearid, teamid, wswin
+ORDER BY max_wins DESC, min_wins ASC
+
+
+--2006	"SLN"	83	"Winner"
+
+-------------------
+SELECT * FROM teams
+--"1871-2016"
+
+
+
+--8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+SELECT 
+		name
+	,	park_name
+	,	ROUND(CAST(homegames.attendance AS NUMERIC)/CAST(homegames.games AS NUMERIC),2) AS avg_attendance	
+FROM homegames
+		INNER JOIN parks
+			USING(park)
+				INNER JOIN teams
+					ON homegames.year=teams.yearid
+					AND homegames.team=teams.teamid
+WHERE games>=10 AND year=2016
+ORDER BY avg_attendance DESC
+LIMIT 5;
+---------------------------------------
+
+SELECT 
+		name
+	,	park_name
+	,	ROUND(CAST(homegames.attendance AS NUMERIC)/CAST(homegames.games AS NUMERIC),2) AS avg_attendance	
+FROM homegames
+		INNER JOIN parks
+			USING(park)
+				INNER JOIN teams
+					ON homegames.year=teams.yearid
+					AND homegames.team=teams.teamid
+WHERE games>=10 AND year=2016
+ORDER BY avg_attendance ASC
+LIMIT 5;
+-----------------------------------------------------------------------------------------------------------------------
+
+--9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+
+SELECT 
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	,	lgid
+	,	lgid
+	,	awardid
+FROM awardsmanagers
+	INNER JOIN people
+		USING(playerid)
+WHERE awardid='TSN Manager of the Year' AND lgid IN('AL', 'NL') --(--lgid='AL' AND lgid='NL')
+GROUP BY full_name, lgid, awardid
+
+
+--"Davey Johnson"	"AL"	"TSN Manager of the Year"
+--"Davey Johnson"	"NL"	"TSN Manager of the Year"
+--WHERE lgid='AL' AND lgid='NL' AND awardid='TSN Manager of the Year'
+----------------------------------------------------------------------
+--Going to try using CTEs to pull from. only need 2 names missing managers table. 
+
+WITH award AS (
+				SELECT awardid
+					,	playerid
+				FROM awardsmanagers
+			    WHERE awardid='TSN Manager of the Year' AND lgid IN('AL', 'NL')
+				)
+-- --,	nl_league AS (SELECT lgid
+-- 						,	playerid
+-- 					-FROM awardsmanagers
+-- 					WHERE lgid='NL'
+-- 					)	
+-- --,	al_league AS (
+-- 					--SELECT lgid
+-- 						,	playerid
+-- 					FROM awardsmanagers
+-- 					WHERE lgid='AL'
+-- 					)
+
+SELECT 
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	--,	award.awardid
+	,	awardsmanagers.lgid
+	--,	playerid
+	--,	teamid
+FROM awardsmanagers
+	INNER JOIN award
+		ON awardsmanagers.playerid=award.playerid
+			--INNER JOIN nl_league
+				--ON awardsmanagers.playerid=nl_league.playerid
+					--INNER JOIN al_league
+						--ON awardsmanagers.playerid=al_league.playerid
+							INNER JOIN people
+								ON awardsmanagers.playerid=people.playerid
+
+GROUP BY full_name, award.awardid, awardsmanagers.lgid
+ORDER BY full_name
+
+
+-----------------------------------------------------------------------------------------------------------------
+
+
+--10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+
+WITH 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
