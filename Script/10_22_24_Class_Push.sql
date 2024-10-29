@@ -219,6 +219,15 @@ ORDER BY stolen_bases_sucess DESC
 --7. From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 --largest wins for a team (and didnt win world series)
 --smallest wins for a team (did win world series)
+need answer 
+
+--8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+-- (attendance from homegames table
+-- (teams & parks Top 5 average attendance per game in 2016
+-- Info: Average attendance = total attendance / number of games
+-- (only parks with at least 10 games
+-- Park name, Team name, Average attendance
+-- Repeat for the lowest 5 average attendance
 (SELECT park_name,
        t.name AS team_name,
        ROUND((AVG(h.attendance)/h.games),0) AS avg_attendance,
@@ -226,12 +235,68 @@ ORDER BY stolen_bases_sucess DESC
 FROM homegames AS h 
 INNER JOIN parks AS p
 USING (park)
-
---8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
-
+	LEFT JOIN teams AS t
+	ON t.park =p.park_name
+WHERE year= '2016'
+AND games >'10'
+AND t.yearid = '2016'
+GROUP BY park_name,t.name,games
+ORDER BY avg_attendance DESC
+LIMIT 5)
+UNION
+(SELECT park_name,
+       t.name AS team_name,
+       ROUND((AVG(h.attendance)/h.games),0) AS avg_attendance,
+       'BOTTOM 5' AS ranking
+FROM homegames AS h 
+INNER JOIN parks AS p
+USING (park)
+	LEFT JOIN teams AS t
+	ON t.park =p.park_name
+WHERE year= '2016'
+AND games >'10'
+AND t.yearid = '2016'
+GROUP BY park_name,t.name,games
+ORDER BY avg_attendance ASC
+LIMIT 5)
+ORDER BY Avg_attendance DESC;
 
 --9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+-- (managers won TSN Manager of the Year award
+-- (National league & American league
+-- Full name & team they managed at the time of award
+WITH tsn_managers AS (
+SELECT playerid, yearid, lgid
+FROM awardsmanagers
+WHERE awardid = 'TSN Manager of the Year'
+AND lgid IN ('NL', 'AL')
 
+), man_by_year AS (
+SELECT DISTINCT tsn.playerid, tsn.yearid
+FROM tsn_managers AS tsn
+JOIN tsn_managers AS tsn2
+ON tsn.playerid = tsn2.playerid
+AND tsn.lgid <> tsn2.lgid
+)
+SELECT p.namefirst, p.namelast, t.name, m.yearid
+FROM man_by_year AS mby
+
+INNER JOIN managers AS m
+ON mby.playerid = m.playerid
+AND mby.yearid = m.yearid
+
+INNER JOIN people AS p
+ON mby.playerid = p.playerid
+
+INNER JOIN teams AS t
+ON mby.yearid = t.yearid
+AND m.teamid = t.teamid
+
+ORDER BY namefirst
 
 --10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
-
+-- (players with their career highest number homes runs in 2016
+-- (played in the league 10+ years
+-- (hit at least 1 home run in 2016
+-- First name, Last name, Number of home runs they hit in 2016
+needs answer
