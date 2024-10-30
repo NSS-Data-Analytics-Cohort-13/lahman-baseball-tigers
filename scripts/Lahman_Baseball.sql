@@ -158,7 +158,22 @@ _____
 
 
 
+
+
+
+
 --6:Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
+
+
+
+
+
+
+
+
+
+
+
 
 
 -- select 
@@ -199,18 +214,93 @@ GROUP BY yearid
 ORDER BY yearid
 
 
--- 
+-- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
+
+
 SELECT 
-		MIN(w) min_win
-		, yearid
+		p.park_name
+	  , t.name AS team_name
+	  , ROUND(CAST(h.attendance AS NUMERIC)/CAST(h.games AS NUMERIC), 2) avg_attendance
+FROM homegames AS h
+INNER JOIN parks AS p
+USING(park)
+INNER JOIN teams AS t 
+ON h.year =  t.yearid
+WHERE h.year = 2016 AND h.games >= 10
+ORDER BY avg_attendance DESC;
+
+LIMIT 5 ASC
+
+
+SELECT
+		name
+	,	park_name
+	,	ROUND(CAST(homegames.attendance AS NUMERIC)/CAST(homegames.games AS NUMERIC),2) AS avg_attendance	
+FROM homegames
+		INNER JOIN parks
+			USING(park)
+				INNER JOIN teams
+					ON homegames.year=teams.yearid
+					AND homegames.team=teams.teamid
+WHERE games>=10 AND year=2016
+ORDER BY avg_attendance DESC
+LIMIT 5;
+
+--9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
+
+SELECT 
+		   CONCAT(p.namefirst,' ',p.namelast) AS full_name
+		 , SELECT awardid AS tsn_winner_managers FROM awardsmanagers WHERE lgid = 'AL' AND lgid = 'NL'
+		 , t.teamid AS team_name
+FROM awardsmanagers
+FULL JOIN people AS p
+USING(playerid)
+FULL JOIN managershalf AS m
+ON p.playerid = m.playerid
+FULL JOIN teams AS t
+ON t.teamid = m.teamid
+WHERE 
+	(SELECT 
+			CASE WHEN igid = 'AL' THEN '1'
+			CASE WHEN igid = 'NL' THEN '1' ELSE END
+			FROM awardsmanagers)
+
+AND 
+
+
+SELECT 
+		   (SELECT CONCAT(p.namefirst,' ',p.namelast) AS full_name FROM awardsmanagers WHERE gid = 'AL and igid = 'NL GROUP BY full_name'
+		 , am.awardid AS tsn_winner_managers
+		 , t.teamid AS team_name
+		 , (SELECT igid)
+FROM awardsmanagers AS am
+FULL JOIN people AS p
+USING(playerid)
+FULL JOIN managershalf AS m
+ON p.playerid = m.playerid
+FULL JOIN teams AS t
+ON t.teamid = m.teamid
+WHERE am.awardid ILIKE 'TSN% 
+
+
+
+SELECT *  FROM awardsmanagers
+(SELECT distinct awardid FROM awardsmanagers WHERE awardid ILIKE 'TSN%') AS tsn_winner_managers
+
+SELECT * FROM parks
+select * from homegames
+select * from teams
+
+SELECT 
+		*
 FROM teams
 WHERE yearid BETWEEN 1970 AND 2016
 
 select 
 
 
-SELECT cs, sb
-FROM batting
+SELECT *
+FROM teams
 
 select yearid, so
 from pitching
@@ -222,8 +312,8 @@ from teams
 select so, yearid
 from battingpost
 
-select so, yearid
-from pitchingpost
+select *
+from homegames
 
 
 SELECT max(yearid)
@@ -253,6 +343,9 @@ FROM people
 		USING(teamid)
 GROUP BY people.playerid, name, teams.franchid
 ORDER BY min_height
+
+
+SELECT * FROM parks
 
 
 
