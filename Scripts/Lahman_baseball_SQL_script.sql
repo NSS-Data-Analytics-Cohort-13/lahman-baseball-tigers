@@ -622,42 +622,42 @@ WHERE awardsmanagers.awardid='TSN Manager of the Year' AND awardsmanagers.lgid!=
 GROUP BY full_name,awardsmanagers.lgid, managers.playerid
 ORDER BY full_name
 ------------------------------------------------
+--correct
 WITH award_al AS (
-				SELECT awardid
-					,	 playerid
+				SELECT --awardid
+						DISTINCT playerid, yearid
 				FROM awardsmanagers
 			    WHERE lgid='AL'
+				AND awardid='TSN Manager of the Year' AND playerid IN('johnsda02', 'leylaji99')
 				)
 
 ,	award_nl AS (
-				SELECT awardid, playerid
+				SELECT --awardid,
+				DISTINCT playerid, yearid
 				FROM awardsmanagers
-				WHERE lgid='NL')
+				WHERE lgid='NL' AND awardid='TSN Manager of the Year' AND playerid IN('johnsda02', 'leylaji99'))
 
-,	team_name AS (
-					SELECT 
-)
-SELECT  name
-	,
-		concat(people.namefirst, ' ', people.namelast) AS full_name
-	,	awardsmanagers.lgid
-	,   managers.playerid
-	
-FROM (Select name from teams)
-	JOIN awardsmanagers
-	USING(yearid)
-	 JOIN award_nl
-		ON awardsmanagers.playerid=award_nl.playerid
+SELECT  DISTINCT
+		teams.name AS team_name
+	,	concat(people.namefirst, ' ', people.namelast) AS full_name
+	--,	awardsmanagers.lgid
+	--,   managers.playerid
+	,	'TSN Manager of the Year'
+FROM managers
+	LEFT JOIN award_nl
+		ON managers.playerid=award_nl.playerid AND managers.yearid=award_nl.yearid
 			 JOIN people
-				ON awardsmanagers.playerid=people.playerid
-					 JOIN managers
-						ON awardsmanagers.playerid=managers.playerid
-							INNER JOIN award_al
-								ON awardsmanagers.playerid=award_al.playerid
-WHERE awardsmanagers.awardid='TSN Manager of the Year' AND awardsmanagers.lgid!='ML' AND awardsmanagers.lgid IN('AL','NL') AND managers.playerid IN('johnsda02', 'leylaji99')
-GROUP BY full_name,awardsmanagers.lgid, managers.playerid
+				ON managers.playerid=people.playerid
+					 --JOIN managers
+						--ON awardsmanagers.playerid=managers.playerid
+							LEFT JOIN award_al
+								ON managers.playerid=award_al.playerid  AND managers.yearid=award_al.yearid
+									INNER JOIN teams
+										ON managers.teamid=teams.teamid AND managers.yearid=teams.yearid
+--WHERE awardsmanagers.awardid='TSN Manager of the Year' AND awardsmanagers.lgid!='ML' AND awardsmanagers.lgid IN('AL','NL') AND managers.playerid IN('johnsda02', 'leylaji99')
+WHERE (award_al.yearid IS NOT NULL OR award_nl.yearid IS NOT NULL)
+GROUP BY full_name,team_name--,   managers.playerid
 ORDER BY full_name
-
 
 
 
@@ -678,13 +678,68 @@ ORDER BY full_name
 
 --10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
 
-WITH 
+
+--first and last name from people using: concat(people.namefirst, ' ', people.namelast) AS full_name
+-- where yearid=2016 from teams
+-- I need to create a table showing each players total number of HR per year then find the max of that and compare that to their 2016 total and see if 2016s total is higher than their highest throughout their years
+--find years in league at >=10 so maybe <=2006?
 
 
+WITH career_high_2016 AS (SELECT 
+								playerid
+							,	max(hr) AS max_hr
+								FROM batting
+								GROUP BY playerid
+								)
+
+,		total_2016 AS (SELECT 
+							playerid
+						,	SUM(hr) AS total_hr
+							FROM batting
+							WHERE yearid=2016
+							GROUP BY playerid
+							)
+
+,			ten_or_more AS (SELECT distinct
+								playerid
+							FROM batting
+							WHERE yearid <=2006
+							)
 
 
+SELECT
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	,	total_hr
+	,	max_hr
+	,	CASE WHEN total_hr>=max_hr THEN 'record' ELSE 'Not a record' END AS record
+FROM people	
+	INNER JOIN career_high_2016
+		USING(playerid)
+			INNER JOIN total_2016
+				USING(playerid)
+					INNER JOIN ten_or_more
+						USING(playerid)
+WHERE total_hr>0
+ORDER BY total_hr DESC
 
 
+----------------------------------------------
+
+
+SELECT DISTINCT
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	,	teams.yearid
+	,	batting.hr
+	,	CASE WHEN yearid=2016 AND hr>=1 then '2016'
+			WHEN yearid<=2006 then 'at least 10' years END) AS total_l
+
+FROM people
+	JOIN batting
+		USING(playerid)
+			JOIN teams
+				ON batting.yearid=teams.yearid
+			
+	
 
 
 
