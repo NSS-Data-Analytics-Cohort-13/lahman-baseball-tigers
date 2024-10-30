@@ -304,46 +304,148 @@ ORDER BY percentage_success DESC
 
 --7.  From 1970 – 2016, what is the largest number of wins for a team that did not win the world series? What is the smallest number of wins for a team that did win the world series? Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
-SELECT 	
-		yearid
-	,	teamid
-	,	MAX(w) AS max_wins
-	,	MIN(w) AS min_wins
-	,	CASE WHEN wswin='Y' THEN 'Winner'
-			 WHEN  wswin='N' THEN 'Loser' ELSE 'Didnt Make WS' END AS ws_win_loss
+--pecentage query correct
 
+WITH max_wins_w AS (SELECT
+					yearid, MAX(w) AS m_w
+					FROM teams
+					WHERE yearid>= 1970 AND wswin='Y'
+					GROUP BY yearid)
+
+,	max_wins_l AS (SELECT
+					yearid, MAX(w) AS m_w
+					FROM teams
+					WHERE yearid>= 1970 AND wswin='N'
+					GROUP BY yearid)
+
+SELECT --yearid
+	--,	m.m_w AS most_win_ws_winner
+	--,	m_l.m_w AS most_win_ws_loser
+		--COUNT(CASE WHEN m.m_w >= m_l.m_w THEN 'max win win' END),
+		SUM(CASE WHEN m.m_w >= m_l.m_w THEN 1 ELSE 0 END) AS sum_max_winner, 
+		(SUM(CASE WHEN m.m_w >= m_l.m_w THEN 1 ELSE 0 END)*1.0/COUNT(*)) *100 AS percentage
+FROM max_wins_w AS m
+	INNER JOIN max_wins_l m_l
+		USING(yearid)
+WHERE m.yearid !=1981
+
+
+
+
+
+
+
+SELECT
+		CAST(COUNT(CASE WHEN teams.w=m_w AND wswin='Y' THEN 'winner' END) AS NUMERIC)/CAST(COUNT(CASE WHEN teams.yearid>=1970 THEN 'years' END) AS NUMERIC)*100 AS percent_winner
 FROM teams
-WHERE yearid BETWEEN 1970 AND 2016
-GROUP BY yearid, teamid, wswin
-ORDER BY max_wins DESC, min_wins ASC
+	INNER JOIN max_wins
+		ON teams.yearid=max_wins.yearid
+WHERE teams.yearid>=1970
+----------------------------
+SELECT MAX(w) AS max_w
+	,	COUNT(case when yearid>=1970 AND wswin='Y' AND w=max_w THEN 'winner' END) AS winn_er
+FRom teams
+WHERE wswin IS NOT NULL
+GROUP BY yearid, wswin, w
 
---2001	"SEA"	116	 "Loser"
---1981	"LAN"	63	"Winner"	
+
+
+
+
 -------------------------------------------
---i need to find the percentage also use a CTE too many rows
+--How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
-WITH  wins_yes AS (SELECT --teamid,
+WITH  wins_yes AS (SELECT yearid, g,
 				max(w) AS max_wins_y
 				FROM teams
-				WHERE wswin='Y')
-				--GROUP BY teamid)
+				WHERE wswin='Y' AND yearid>=1970
+				GROUP BY yearid,g)
 				
-,     wins_min_yes AS (SELECT --teamid,
+,     wins_min_yes AS (SELECT yearid, g,
 				min(w) AS min_wins_y
 				FROM teams
-				WHERE wswin='Y')
-				--GROUP BY teamid)
+				WHERE wswin='Y' AND yearid>=1970
+				GROUP BY yearid,g)
 
-,         max_wins_no AS (SELECT --teamid,
+,         max_wins_no AS (SELECT  yearid,g,
 				max(w) AS max_wins_n
 				FROM teams
-				WHERE wswin='N')
-				--GROUP BY teamid)
+				WHERE wswin='N' AND yearid>=1970
+				GROUP BY yearid,g)
 
-SELECT max_wins_y
-	,	min_wins_y
-	,	max_wins_n
-FROM wins_yes, wins_min_yes, max_wins_no
+,			most_win_yes_count AS (SELECT yearid, g,
+							COUNT(CASE WHEN yearid>=1970 AND wswin='Y' THEN 'winner' END) AS count_win
+							FROM teams
+							WHERE yearid>=1970 AND wswin='Y'
+							GROUP BY yearid,g)
+SELECT 
+		--COUNT(CAST(wins_yes.g AS NUMERIC) --AS total_games
+		MAX(max_wins_y) as max_wins_yes
+	 ,	 MIN(min_wins_y) as min_wins_yes
+	 ,	 MAX(max_wins_n) as max_wins_no
+	 ,	COUNT(count_win)/COUNT(*) AS percent_winner
+	--,	COUNT(CASE WHEN count_win IS NOT NULL THEN 'count win' END)*100/total_games AS percent_winner
+	--,	COUNT(CASE WHEN countwin.yearid>=1970 AND wswin='Y' THEN 'winner' END)*100/COUNT(*) AS percent_winner
+FROM wins_yes--, wins_min_yes, max_wins_no, most_win_yes_count
+	INNER JOIN wins_min_yes
+	 	USING(yearid)
+	 		INNER JOIN max_wins_no
+	 			USING(yearid)
+	 				INNER JOIN most_win_yes_count
+						USING(yearid)
+-- GROUP BY  max_wins_y
+-- 	 ,	 min_wins_y 
+-- 	 ,	 max_wins_n
+LIMIT 1
+-----------------------------------------------------
+
+WITH  wins_yes AS (SELECT yearid,--, g,
+				max(w) AS max_wins_y
+				FROM teams
+				WHERE wswin='Y' AND yearid>=1970
+				GROUP BY yearid)
+				
+,     wins_min_yes AS (SELECT yearid,
+				min(w) AS min_wins_y
+				FROM teams
+				WHERE wswin='Y' AND yearid>=1970
+				GROUP BY yearid)
+
+,         max_wins_no AS (SELECT  yearid,--,g,
+				max(w) AS max_wins_n
+				FROM teams
+				WHERE wswin='N' AND yearid>=1970
+				GROUP BY yearid)
+
+SELECT 
+		MAX(max_wins_y) as max_wins_yes
+	 ,	 MIN(min_wins_y) as min_wins_yes
+	 ,	 MAX(max_wins_n) as max_wins_no
+FROM wins_yes
+	INNER JOIN wins_min_yes
+	 	USING(yearid)
+	 		INNER JOIN max_wins_no
+			 	USING(yearid)
+WHERE yearid !=1981
+LIMIT 1
+---------------------------------------
+SELECT yearid, wswin,
+				max(w) AS max_wins_y
+				FROM teams
+				WHERE yearid>=1970 AND yearid=1970
+				GROUP BY yearid, wswin
+				
+
+--2008	92
+
+
+
+
+
+
+
+				
+-----------------------------------------------------------------------------
 FROM teams
 	INNER JOIN wins_yes
 		USING(teamid)
@@ -377,6 +479,29 @@ ORDER BY max_wins DESC, min_wins ASC
 -------------------
 SELECT * FROM teams
 --"1871-2016"
+---------------------------------
+WITH  wins_yes AS (SELECT --teamid,
+				max(w) AS max_wins_y
+				FROM teams
+				WHERE wswin='Y')
+				--GROUP BY teamid)
+				
+,     wins_min_yes AS (SELECT --teamid,
+				min(w) AS min_wins_y
+				FROM teams
+				WHERE wswin='Y')
+				--GROUP BY teamid)
+
+,         max_wins_no AS (SELECT --teamid,
+				max(w) AS max_wins_n
+				FROM teams
+				WHERE wswin='N')
+				--GROUP BY teamid)
+
+SELECT max_wins_y
+	,	min_wins_y
+	,	max_wins_n
+FROM wins_yes, wins_min_yes, max_wins_no
 
 
 
@@ -434,40 +559,118 @@ GROUP BY full_name, lgid, awardid
 
 WITH award AS (
 				SELECT awardid
-					,	playerid
+					--,	 playerid
 				FROM awardsmanagers
 			    WHERE awardid='TSN Manager of the Year' AND lgid IN('AL', 'NL')
 				)
--- --,	nl_league AS (SELECT lgid
--- 						,	playerid
--- 					-FROM awardsmanagers
--- 					WHERE lgid='NL'
--- 					)	
--- --,	al_league AS (
--- 					--SELECT lgid
--- 						,	playerid
--- 					FROM awardsmanagers
--- 					WHERE lgid='AL'
--- 					)
 
 SELECT 
 		concat(people.namefirst, ' ', people.namelast) AS full_name
-	--,	award.awardid
 	,	awardsmanagers.lgid
-	--,	playerid
-	--,	teamid
+	,   managers.playerid
 FROM awardsmanagers
-	INNER JOIN award
+	 JOIN award
 		ON awardsmanagers.playerid=award.playerid
-			--INNER JOIN nl_league
-				--ON awardsmanagers.playerid=nl_league.playerid
-					--INNER JOIN al_league
-						--ON awardsmanagers.playerid=al_league.playerid
-							INNER JOIN people
-								ON awardsmanagers.playerid=people.playerid
+			 JOIN people
+				ON awardsmanagers.playerid=people.playerid
+					 JOIN managers
+						ON awardsmanagers.playerid=managers.playerid
 
-GROUP BY full_name, award.awardid, awardsmanagers.lgid
+GROUP BY full_name, award.awardid, awardsmanagers.lgid, managers.playerid
 ORDER BY full_name
+-----------------------------------------------------
+SELECT 
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	,	awardsmanagers.lgid
+	--,   managers.playerid
+FROM awardsmanagers
+		JOIN people
+			ON awardsmanagers.playerid=people.playerid
+				JOIN managers
+					ON awardsmanagers.playerid=managers.playerid
+WHERE awardid='TSN Manager of the Year' AND awardsmanagers.lgid='AL' AND awardsmanagers.lgid='NL'
+GROUP BY full_name, awardsmanagers.lgid, managers.playerid
+ORDER BY full_name
+-----------------------------------------------------
+WITH award_al AS (
+				SELECT awardid
+					,	 playerid
+				FROM awardsmanagers
+			    WHERE lgid='AL'
+				)
+
+,	award_nl AS (
+				SELECT awardid, playerid
+				FROM awardsmanagers
+				WHERE lgid='NL'
+)
+SELECT  
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	,	awardsmanagers.lgid
+	,   managers.playerid
+	
+FROM awardsmanagers
+	 JOIN award_nl
+		ON awardsmanagers.playerid=award_nl.playerid
+			 JOIN people
+				ON awardsmanagers.playerid=people.playerid
+					 JOIN managers
+						ON awardsmanagers.playerid=managers.playerid
+							INNER JOIN award_al
+								ON awardsmanagers.playerid=award_al.playerid
+WHERE awardsmanagers.awardid='TSN Manager of the Year' AND awardsmanagers.lgid!='ML' AND awardsmanagers.lgid IN('AL','NL') AND managers.playerid IN('johnsda02', 'leylaji99')
+GROUP BY full_name,awardsmanagers.lgid, managers.playerid
+ORDER BY full_name
+------------------------------------------------
+WITH award_al AS (
+				SELECT awardid
+					,	 playerid
+				FROM awardsmanagers
+			    WHERE lgid='AL'
+				)
+
+,	award_nl AS (
+				SELECT awardid, playerid
+				FROM awardsmanagers
+				WHERE lgid='NL')
+
+,	team_name AS (
+					SELECT 
+)
+SELECT  name
+	,
+		concat(people.namefirst, ' ', people.namelast) AS full_name
+	,	awardsmanagers.lgid
+	,   managers.playerid
+	
+FROM (Select name from teams)
+	JOIN awardsmanagers
+	USING(yearid)
+	 JOIN award_nl
+		ON awardsmanagers.playerid=award_nl.playerid
+			 JOIN people
+				ON awardsmanagers.playerid=people.playerid
+					 JOIN managers
+						ON awardsmanagers.playerid=managers.playerid
+							INNER JOIN award_al
+								ON awardsmanagers.playerid=award_al.playerid
+WHERE awardsmanagers.awardid='TSN Manager of the Year' AND awardsmanagers.lgid!='ML' AND awardsmanagers.lgid IN('AL','NL') AND managers.playerid IN('johnsda02', 'leylaji99')
+GROUP BY full_name,awardsmanagers.lgid, managers.playerid
+ORDER BY full_name
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 -----------------------------------------------------------------------------------------------------------------
