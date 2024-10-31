@@ -165,17 +165,6 @@ _____
 --6:Find the player who had the most success stealing bases in 2016, where __success__ is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted _at least_ 20 stolen bases.
 
 
-
-
-
-
-
-
-
-
-
-
-
 -- select 
 -- 		  cs
 -- 		, sb
@@ -187,7 +176,7 @@ select
 		--   cs
 		-- , sb
 		-- , cs+sb
-		CONCAT(p.namefirst,' ',p.namelast) AS full_name
+		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
 		, ROUND(sb::NUMERIC/(cs::NUMERIC+sb::NUMERIC)*100, 2) AS success_rate
 	    , yearid
 from batting 
@@ -203,15 +192,36 @@ ORDER BY success_rate DESC;
 --Doing this will probably result in an unusually small number of wins for a world series champion – determine why this is the case. 
 --Then redo your query, excluding the problem year. How often from 1970 – 2016 was it the case that a team with the most wins also won the world series? What percentage of the time?
 
+7 perceentage) WITH max_wins_w AS (SELECT
+					yearid, MAX(w) AS m_w
+					FROM teams
+					WHERE yearid>= 1970 AND wswin='Y'
+					GROUP BY yearid)
+,	max_wins_l AS (SELECT
+					yearid, MAX(w) AS m_w
+					FROM teams
+					WHERE yearid>= 1970 AND wswin='N'
+					GROUP BY yearid)
+SELECT --yearid
+	--,	m.m_w AS most_win_ws_winner
+	--,	m_l.m_w AS most_win_ws_loser
+		--COUNT(CASE WHEN m.m_w >= m_l.m_w THEN 'max win win' END),
+		SUM(CASE WHEN m.m_w >= m_l.m_w THEN 1 ELSE 0 END) AS sum_max_winner,
+		(SUM(CASE WHEN m.m_w >= m_l.m_w THEN 1 ELSE 0 END)*1.0/COUNT(*)) *100 AS percentage
+FROM max_wins_w AS m
+	INNER JOIN max_wins_l m_l
+		USING(yearid)
+WHERE m.yearid !=1981
 
-SELECT 
-	      MAX(w) AS max_win
-		, MIN(w) AS min_win
-		, yearid
-FROM teams
-where yearid BETWEEN 1970 AND 2016
-GROUP BY yearid
-ORDER BY yearid
+
+-- SELECT 
+-- 	      MAX(w) AS max_win
+-- 		, MIN(w) AS min_win
+-- 		, yearid
+-- FROM teams
+-- where yearid BETWEEN 1970 AND 2016
+-- GROUP BY yearid
+-- ORDER BY yearid
 
 
 -- 8. Using the attendance figures from the homegames table, find the teams and parks which had the top 5 average attendance per game in 2016 (where average attendance is defined as total attendance divided by number of games). Only consider parks where there were at least 10 games played. Report the park name, team name, and average attendance. Repeat for the lowest 5 average attendance.
@@ -250,100 +260,115 @@ LIMIT 5;
 
 
 SELECT 
-		  playerid
-		, yearid
-		, awardid
-		, lgid
-FROM awardsmanagers
-WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year' --AND playerid ILIKE 'coxbo01'
-UNION
-SELECT 
-		  playerid
-		, yearid
-		, awardid
-		, lgid
-FROM awardsmanagers
-WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year' --AND playerid ILIKE 'coxbo01'
-
-
-
-
----------------------------------------------------------------------------------
-
-SELECT 
-		    CONCAT(p.namefirst,' ',p.namelast) AS full_name
-			--, am.awardid
-		  --, m.teamid AS team_name
-		  , DISTINCT t.name AS team_name
-		  -- , m.yearid
-		  -- , al_award.yearid
-		  -- , nl_award.yearid
-		  -- , m.yearid
-		  -- , t.yearid
-		  -- , p.playerid
-		  
+		      
+		  distinct CONCAT(p.namefirst,' ',p.namelast) AS full_name
+		--
+		-- , nl.lgid
+		-- , nl.nl_yearid
+		, t.name AS nlteamname
+		, al.lgid
+		-- , al.al_yearid
+		--  , ta.name as alteamname
 FROM (SELECT 
-		  playerid
-		, yearid
-		, awardid
+		      playerid
+		    , yearid AS nl_yearid
+			, lgid
+		  --, awardid
 FROM awardsmanagers
-WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year') AS nl_award
+WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year') AS nl
 INNER JOIN (SELECT 
-		  playerid
-		, yearid
-		,awardid
+		      playerid
+		    , yearid AS al_yearid
+			, lgid
+		  --, awardid
 FROM awardsmanagers
-WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year') AS al_award
-ON nl_award.yearid = al_award.yearid --AND nl_award.playerid = al_award.playerid
+WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year') AS al
+ON nl.playerid = al.playerid
 INNER JOIN people AS p
-ON p.playerid = al_award.playerid
-INNER JOIN managers AS m
-ON m.playerid = p.playerid AND m.yearid = nl_award.yearid 
-INNER JOIN teams AS t
-ON t.teamid = m.teamid AND t.yearid = nl_award.yearid 
-ORDER BY full_name, team_name
+ON p.playerid = nl.playerid
+left JOIN managers AS m
+ON m.playerid = p.playerid AND  m.yearid = nl.nl_yearid
+left JOIN managers AS ma
+ON ma.playerid = p.playerid AND  ma.yearid = al.al_yearid
+left JOIN teams AS t
+ON t.teamid = m.teamid AND t.yearid = nl.nl_yearid 
+left JOIN teams AS ta
+ON ta.teamid = ma.teamid AND ta.yearid = al.al_yearid
 
 
 
-INNER JOIN awardsmanagers AS am
-ON nl_award.playerid = am.playerid  
+
+
+--ON nl_award.yearid = al_award.yearid --AND nl_award.playerid = al_award.playerid
+-- INNER JOIN people AS p
+-- ON p.playerid = man.playerid
+-- INNER JOIN managers AS m
+-- ON m.playerid = p.playerid AND m.yearid = man.yearid 
+-- INNER JOIN teams AS t
+-- ON t.teamid = m.teamid AND t.yearid = man.yearid 
+-- ORDER BY full_name, team_name
+
+
+--  SELECT *
 
 
 
-SELECT 
-		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
-		, am.awardid
-		, t.teamid AS team_name
-		, am.lgid
-FROM awardsmanagers AS am
-FULL JOIN people AS p
-USING(playerid)
-FULL JOIN managershalf AS m
-ON p.playerid = m.playerid
-FULL JOIN teams AS t
-ON t.teamid = m.teamid
-WHERE am.lgid IN ('AL','NL') AND am.awardid ILIKE 'TSN%' AND t.teamid IS NOT NULL  
-GROUP BY am.awardid, am.lgid, full_name, team_name
-ORDER BY am.awardid
 
 
-SELECT 
+-- SELECT 
+-- 		  playerid
+-- 		, yearid
+-- 		, awardid
+-- 		, lgid
+-- FROM awardsmanagers
+-- WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year' --AND playerid ILIKE 'coxbo01'
+-- UNION
+-- SELECT 
+-- 		  playerid
+-- 		, yearid
+-- 		, awardid
+-- 		, lgid
+-- FROM awardsmanagers
+-- WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year' --AND playerid ILIKE 'coxbo01'
+-- INNER JOIN awardsmanagers AS am
+-- ON nl_award.playerid = am.playerid  
 
-SELECT 
-		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
-		, am.awardid
-		, t.teamid AS team_name
-		, am.lgid
-FROM awardsmanagers AS am
-FULL JOIN people AS p
-USING(playerid)
-FULL JOIN managershalf AS m
-ON p.playerid = m.playerid
-FULL JOIN teams AS t
-ON t.teamid = m.teamid
-WHERE am.lgid = 'AL' AND am.lgid = 'NL' AND am.awardid = 'TSN%' AND t.teamid IS NOT NULL  
-GROUP BY am.awardid, am.lgid, full_name, team_name
-ORDER BY am.awardid
+
+
+-- SELECT 
+-- 		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
+-- 		, am.awardid
+-- 		, t.teamid AS team_name
+-- 		, am.lgid
+-- FROM awardsmanagers AS am
+-- FULL JOIN people AS p
+-- USING(playerid)
+-- FULL JOIN managershalf AS m
+-- ON p.playerid = m.playerid
+-- FULL JOIN teams AS t
+-- ON t.teamid = m.teamid
+-- WHERE am.lgid IN ('AL','NL') AND am.awardid ILIKE 'TSN%' AND t.teamid IS NOT NULL  
+-- GROUP BY am.awardid, am.lgid, full_name, team_name
+-- ORDER BY am.awardid
+
+
+-- SELECT 
+
+-- SELECT 
+-- 		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
+-- 		, am.awardid
+-- 		, t.teamid AS team_name
+-- 		, am.lgid
+-- FROM awardsmanagers AS am
+-- FULL JOIN people AS p
+-- USING(playerid)
+-- FULL JOIN managershalf AS m
+-- ON p.playerid = m.playerid
+-- FULL JOIN teams AS t
+-- ON t.teamid = m.teamid
+-- WHERE am.lgid = 'AL' AND am.lgid = 'NL' AND am.awardid = 'TSN%' AND t.teamid IS NOT NULL  
+-- GROUP BY am.awardid, am.lgid, full_name, team_name
+-- ORDER BY am.awardid
 
 
 
@@ -433,72 +458,145 @@ ORDER BY full_name
 
 
 
-
-
-
-
-SELECT *  FROM awardsmanagers
-(SELECT distinct awardid FROM awardsmanagers WHERE awardid ILIKE 'TSN%') AS tsn_winner_managers
-
-SELECT * FROM parks
-select * from homegames
-select * from teams
-
 SELECT 
-		*
-FROM teams
-WHERE yearid BETWEEN 1970 AND 2016
-
-select 
-
-
-SELECT *
-FROM teams
-
-select yearid, so
-from pitching
-
-
-select so, soa, yearid
-from teams
-
-select so, yearid
-from battingpost
-
-select *
-from homegames
+      	, people.namefirst
+		, people.namelast
+		, b.hr AS hr_high
+FROM batting AS b
+JOIN people
+ON  b.playerid = people.playerid
+AND (SELECT COUNT (DISTINCT yearid)
+    FROM batting
+                WHERE playerid = people.playerid) >= 10
+AND b.hr >=1
+AND b.hr = (
+        SELECT MAX(hr)
+        FROM batting
+        WHERE playerid = b.playerid
+                                AND b.yearid = 2016
+                                
+    )
+GROUP BY people.namefirst,people.namelast,b.hr
+ORDER BY hr_high DESC
 
 
-SELECT max(yearid)
-FROM appearances
+--10 abid
+-- SELECT people.namefirst
+-- 	,	people.namelast
+-- 	,	b.hr AS hr_high
+-- FROM batting AS b
+-- 	INNER JOIN people
+-- 		ON  b.playerid = people.playerid
+-- AND (SELECT COUNT (DISTINCT yearid)
+--     FROM batting
+-- --players had played in league for 10 years
+-- 	WHERE playerid = people.playerid) >= 10
+-- --players had atleast 1 home run in 2016
+-- AND b.hr >=1
+-- --players career hit highest (hr) in 2016
+-- AND b.hr = (
+--         SELECT MAX(hr)
+--         FROM batting
+--         WHERE playerid = b.playerid
+-- 		AND b.yearid = 2016	
+--     )
+-- GROUP BY people.namefirst,people.namelast,b.hr
+--  ORDER BY hr_high DESC
 
-select yearid
-from fieldingofsplit
+--10 ebuka
 
-select cs, sb, yearid
-from teams
-where yearid = 2016
+-- WITH player_career_high AS
+-- (
+--     --Finding each player's career-high home runs
+--     SELECT playerID, MAX(HR) AS MaxHR
+--     FROM Batting
+--     GROUP BY playerID
+-- ),
+-- players_hit AS
+-- (
+--     -- home runs for players in 2016 who hit their career high
+--     SELECT b.playerID, b.HR AS hr_2016
+--     FROM Batting b
+--     JOIN player_career_high pch ON b.playerID = pch.playerID
+-- 	AND b.HR = pch.MaxHR
+--     WHERE b.yearID = 2016 AND b.HR > 0
+-- ),
+-- decade_players AS
+-- (
+--     -- players who have played at least 10 years
+--     SELECT playerID
+--     FROM Batting
+--     GROUP BY playerID
+--     HAVING COUNT(DISTINCT yearID) >= 10
+-- )
+-- SELECT concat(people.namefirst, ' ', people.namelast) AS full_name, p.playerID, p.hr_2016 AS home_runs_2016
+-- FROM players_hit p
+-- JOIN decade_players d ON p.playerID = d.playerID
+-- JOIN people ON p.playerID = people.playerID
+-- ORDER BY p.hr_2016 DESC;
 
-SELECT 
-	CONCAT(MIN(yearid), '-', MAX(yearid)) AS year_range
-FROM managers;
+-- SELECT *  FROM awardsmanagers
+-- (SELECT distinct awardid FROM awardsmanagers WHERE awardid ILIKE 'TSN%') AS tsn_winner_managers
 
---
-SELECT
-		MIN(people.height/12) as min_height
-	,	people.namegiven
-	,	SUM(appearances.g_all) as total_games
-	,	teams.franchid
-FROM people
-	INNER JOIN appearances
-		USING(playerid)
-	INNER JOIN teams
-		USING(teamid)
-GROUP BY people.playerid, name, teams.franchid
-ORDER BY min_height
+-- SELECT * FROM parks
+-- select * from homegames
+-- select * from teams
+
+-- SELECT 
+-- 		*
+-- FROM teams
+-- WHERE yearid BETWEEN 1970 AND 2016
+
+-- select 
 
 
-SELECT * FROM parks
+-- SELECT *
+-- FROM teams
+
+-- select yearid, so
+-- from pitching
+
+
+-- select so, soa, yearid
+-- from teams
+
+-- select so, yearid
+-- from battingpost
+
+-- select *
+-- from homegames
+
+
+-- SELECT max(yearid)
+-- FROM appearances
+
+-- select yearid
+-- from fieldingofsplit
+
+-- select cs, sb, yearid
+-- from teams
+-- where yearid = 2016
+
+-- SELECT 
+-- 	CONCAT(MIN(yearid), '-', MAX(yearid)) AS year_range
+-- FROM managers;
+
+-- --
+-- SELECT
+-- 		MIN(people.height/12) as min_height
+-- 	,	people.namegiven
+-- 	,	SUM(appearances.g_all) as total_games
+-- 	,	teams.franchid
+-- FROM people
+-- 	INNER JOIN appearances
+-- 		USING(playerid)
+-- 	INNER JOIN teams
+-- 		USING(teamid)
+-- GROUP BY people.playerid, name, teams.franchid
+-- ORDER BY min_height
+
+
+-- SELECT * FROM parks
 
 
 
@@ -506,5 +604,5 @@ SELECT * FROM parks
 
 
 
-9:21
-LIMIT 1;
+-- 9:21
+-- LIMIT 1;
