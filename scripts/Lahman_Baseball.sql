@@ -248,31 +248,73 @@ LIMIT 5;
 
 --9. Which managers have won the TSN Manager of the Year award in both the National League (NL) and the American League (AL)? Give their full name and the teams that they were managing when they won the award.
 
+
 SELECT 
-		   CONCAT(p.namefirst,' ',p.namelast) AS full_name
-		 , SELECT awardid AS tsn_winner_managers FROM awardsmanagers WHERE lgid = 'AL' AND lgid = 'NL'
-		 , t.teamid AS team_name
+		  playerid
+		, yearid
+		, awardid
+		, lgid
 FROM awardsmanagers
-FULL JOIN people AS p
-USING(playerid)
-FULL JOIN managershalf AS m
-ON p.playerid = m.playerid
-FULL JOIN teams AS t
-ON t.teamid = m.teamid
-WHERE 
-	(SELECT 
-			CASE WHEN igid = 'AL' THEN '1'
-			CASE WHEN igid = 'NL' THEN '1' ELSE END
-			FROM awardsmanagers)
+WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year' --AND playerid ILIKE 'coxbo01'
+UNION
+SELECT 
+		  playerid
+		, yearid
+		, awardid
+		, lgid
+FROM awardsmanagers
+WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year' --AND playerid ILIKE 'coxbo01'
 
-AND 
+
+
+
+---------------------------------------------------------------------------------
+
+SELECT 
+		    CONCAT(p.namefirst,' ',p.namelast) AS full_name
+			--, am.awardid
+		  --, m.teamid AS team_name
+		  , DISTINCT t.name AS team_name
+		  -- , m.yearid
+		  -- , al_award.yearid
+		  -- , nl_award.yearid
+		  -- , m.yearid
+		  -- , t.yearid
+		  -- , p.playerid
+		  
+FROM (SELECT 
+		  playerid
+		, yearid
+		, awardid
+FROM awardsmanagers
+WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year') AS nl_award
+INNER JOIN (SELECT 
+		  playerid
+		, yearid
+		,awardid
+FROM awardsmanagers
+WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year') AS al_award
+ON nl_award.yearid = al_award.yearid --AND nl_award.playerid = al_award.playerid
+INNER JOIN people AS p
+ON p.playerid = al_award.playerid
+INNER JOIN managers AS m
+ON m.playerid = p.playerid AND m.yearid = nl_award.yearid 
+INNER JOIN teams AS t
+ON t.teamid = m.teamid AND t.yearid = nl_award.yearid 
+ORDER BY full_name, team_name
+
+
+
+INNER JOIN awardsmanagers AS am
+ON nl_award.playerid = am.playerid  
+
 
 
 SELECT 
-		   (SELECT CONCAT(p.namefirst,' ',p.namelast) AS full_name FROM awardsmanagers WHERE gid = 'AL and igid = 'NL GROUP BY full_name'
-		 , am.awardid AS tsn_winner_managers
-		 , t.teamid AS team_name
-		 , (SELECT igid)
+		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
+		, am.awardid
+		, t.teamid AS team_name
+		, am.lgid
 FROM awardsmanagers AS am
 FULL JOIN people AS p
 USING(playerid)
@@ -280,7 +322,118 @@ FULL JOIN managershalf AS m
 ON p.playerid = m.playerid
 FULL JOIN teams AS t
 ON t.teamid = m.teamid
-WHERE am.awardid ILIKE 'TSN% 
+WHERE am.lgid IN ('AL','NL') AND am.awardid ILIKE 'TSN%' AND t.teamid IS NOT NULL  
+GROUP BY am.awardid, am.lgid, full_name, team_name
+ORDER BY am.awardid
+
+
+SELECT 
+
+SELECT 
+		  CONCAT(p.namefirst,' ',p.namelast) AS full_name
+		, am.awardid
+		, t.teamid AS team_name
+		, am.lgid
+FROM awardsmanagers AS am
+FULL JOIN people AS p
+USING(playerid)
+FULL JOIN managershalf AS m
+ON p.playerid = m.playerid
+FULL JOIN teams AS t
+ON t.teamid = m.teamid
+WHERE am.lgid = 'AL' AND am.lgid = 'NL' AND am.awardid = 'TSN%' AND t.teamid IS NOT NULL  
+GROUP BY am.awardid, am.lgid, full_name, team_name
+ORDER BY am.awardid
+
+
+
+
+(SELECT am.awardid FROM awardsmanagers WHERE awardid ILIKE 'TSN%') AS tsn_winner_managers
+
+SELECT *  FROM awardsmanagers
+SELECT * FROM parks
+select * from homegames
+select * from teams
+--am.awardid = 'TNS%' AND am.lgid IN('AL','NL')
+
+--Team query
+WITH award_al AS (
+				SELECT --awardid
+						DISTINCT playerid, yearid
+				FROM awardsmanagers
+			    WHERE lgid='AL'
+				AND awardid='TSN Manager of the Year' AND playerid IN('johnsda02', 'leylaji99')
+				)
+,	award_nl AS (
+				SELECT --awardid,
+				DISTINCT playerid, yearid
+				FROM awardsmanagers
+				WHERE lgid='NL' AND awardid='TSN Manager of the Year' AND playerid IN('johnsda02', 'leylaji99'))
+SELECT  DISTINCT
+		teams.name AS team_name
+	,	concat(people.namefirst, ' ', people.namelast) AS full_name
+	--,	awardsmanagers.lgid
+	--,   managers.playerid
+	,	'TSN Manager of the Year'
+FROM managers
+	LEFT JOIN award_nl
+		ON managers.playerid=award_nl.playerid AND managers.yearid=award_nl.yearid
+			 JOIN people
+				ON managers.playerid=people.playerid
+					 --JOIN managers
+						--ON awardsmanagers.playerid=managers.playerid
+							LEFT JOIN award_al
+								ON managers.playerid=award_al.playerid  AND managers.yearid=award_al.yearid
+									INNER JOIN teams
+										ON managers.teamid=teams.teamid AND managers.yearid=teams.yearid
+--WHERE awardsmanagers.awardid='TSN Manager of the Year' AND awardsmanagers.lgid!='ML' AND awardsmanagers.lgid IN('AL','NL') AND managers.playerid IN('johnsda02', 'leylaji99')
+WHERE (award_al.yearid IS NOT NULL OR award_nl.yearid IS NOT NULL)
+GROUP BY full_name,team_name--,   managers.playerid
+ORDER BY full_name
+
+-- Unsuccessful try
+-- SELECT 
+-- 		   CONCAT(p.namefirst,' ',p.namelast) AS full_name
+-- 		 , (SELECT am.awardid AS tsn_winner_managers FROM awardsmanagers WHERE lgid IN ('AL','NL'))
+-- 		-- , t.teamid AS team_name
+-- 		 --, lgid
+-- FROM awardsmanagers AS am
+-- FULL JOIN people AS p
+-- USING(playerid)
+-- FULL JOIN managershalf AS m
+-- ON p.playerid = m.playerid
+-- FULL JOIN teams AS t
+-- ON t.teamid = m.teamid
+-- WHERE 
+-- 	(SELECT 
+-- 			CASE WHEN igid = 'AL' THEN '1'
+-- 			CASE WHEN igid = 'NL' THEN '1' ELSE END
+-- 			FROM awardsmanagers)
+
+-- AND 
+
+
+-- SELECT 
+-- 		   (SELECT CONCAT(p.namefirst,' ',p.namelast) AS full_name FROM awardsmanagers WHERE lgid IN('AL','NL') GROUP BY full_name
+-- 		 , am.awardid AS tsn_winner_managers
+-- 		 , t.teamid AS team_name
+		
+-- FROM awardsmanagers AS am
+-- FULL JOIN people AS p
+-- USING(playerid)
+-- FULL JOIN managershalf AS m
+-- ON p.playerid = m.playerid
+-- FULL JOIN teams AS t
+-- ON t.teamid = m.teamid
+-- WHERE am.awardid ILIKE 'TSN% 
+
+
+
+--10. Find all players who hit their career highest number of home runs in 2016. Consider only players who have played in the league for at least 10 years, and who hit at least one home run in 2016. Report the players' first and last names and the number of home runs they hit in 2016.
+
+
+
+
 
 
 
