@@ -365,5 +365,29 @@ ORDER BY namefirst
 -- (hit at least 1 home run in 2016
 -- First name, Last name, Number of home runs they hit in 2016
 
+WITH player_career_high AS (
+    -- Step1: Find each player's career-high home runs
+    SELECT playerID, MAX(HR) AS MaxHR
+    FROM Batting
+    GROUP BY playerID
+),
+players_hit AS (
+    -- Step2: Get home runs for players in 2016 who hit their career high
+    SELECT b.playerID, b.HR AS hr_2016
+    FROM Batting b
+    JOIN player_career_high pch ON b.playerID = pch.playerID
+	AND b.HR = pch.MaxHR
+    WHERE b.yearID = 2016 AND b.HR > 0
+),
+decade_players AS (
+    -- Step3: Identify players who have played at least 10 years
+    SELECT playerID
+    FROM Batting
+    GROUP BY playerID
+    HAVING COUNT(DISTINCT yearID) >= 10
+)
+SELECT p.playerID, p.hr_2016 AS home_runs_2016
+FROM players_hit p
+JOIN decade_players d ON p.playerID = d.playerID;
 
 needs answer
