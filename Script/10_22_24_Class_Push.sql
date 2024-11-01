@@ -192,9 +192,9 @@ ORDER BY decade;
 
 
 --------------------6. Find the player who had the most success stealing bases in 2016, where success is measured as the percentage of stolen base attempts which are successful. (A stolen base attempt results either in a stolen base or being caught stealing.) Consider only players who attempted at least 20 stolen bases.
---player (most stealing bases in 2016)
+--player (most stolen bases in 2016)
 --percentage of successful stolen base attempts
---players at least 20 stolen bases or more
+--using players with at least 20 stolen bases or more
 SELECT sb
 FROM batting
 
@@ -218,11 +218,10 @@ WHERE b.yearid = '2016'
 --pulling data from batting and people
 --to find results in the year 2016
 	AND b.sb + b.cs >= 20
-	--including
-	--Group By
+	--using the AND function to make sure we use players with >=20 stolen bases
 	GROUP BY b.playerid, pl.namefirst, pl.namelast, b.sb, b.cs
 ORDER BY stolen_bases_sucess DESC
-
+--Then using GROUP BY 
 LIMIT 1
 
 --Try adding a Group By, is group by needed, why
@@ -264,7 +263,7 @@ FROM wins_yes
 	 			USING(yearid)
 LIMIT 1
 
---7 Percentage)
+-----7 Percentage)
 WITH max_wins_w AS (SELECT
 					yearid, MAX(w) AS m_w
 					FROM teams
@@ -294,6 +293,42 @@ WHERE m.yearid !=1981
 -- Park name, Team name, Average attendance
 -- Repeat for the lowest 5 average attendance
 
+--Group Answer
+SELECT
+		     
+		  distinct CONCAT(p.namefirst,' ',p.namelast) AS full_name
+		--
+		-- , nl.lgid
+		-- , nl.nl_yearid
+		, t.name AS nlteamname
+		, al.lgid
+		-- , al.al_yearid
+		--  , ta.name as alteamname
+FROM (SELECT
+		      playerid
+		    , yearid AS nl_yearid
+			, lgid
+		  --, awardid
+FROM awardsmanagers
+WHERE lgid = 'NL' AND awardid = 'TSN Manager of the Year') AS nl
+INNER JOIN (SELECT
+		      playerid
+		    , yearid AS al_yearid
+			, lgid
+		  --, awardid
+FROM awardsmanagers
+WHERE lgid = 'AL' AND awardid = 'TSN Manager of the Year') AS al
+ON nl.playerid = al.playerid
+INNER JOIN people AS p
+ON p.playerid = nl.playerid
+left JOIN managers AS m
+ON m.playerid = p.playerid AND  m.yearid = nl.nl_yearid
+left JOIN managers AS ma
+ON ma.playerid = p.playerid AND  ma.yearid = al.al_yearid
+left JOIN teams AS t
+ON t.teamid = m.teamid AND t.yearid = nl.nl_yearid
+left JOIN teams AS ta
+ON ta.teamid = ma.teamid AND ta.yearid = al.al_yearid
 --Group Answer
 SELECT
 		name
@@ -329,6 +364,31 @@ LIMIT 5;
 -- (National league & American league
 -- Full name & team they managed at the time of award
 
+--Group Answer
+
+SELECT people.namefirst
+	,	people.namelast
+	,	b.hr AS hr_high
+FROM batting AS b
+	INNER JOIN people
+		ON  b.playerid = people.playerid
+AND (SELECT COUNT (DISTINCT yearid)
+    FROM batting
+--players had played in league for 10 years
+	WHERE playerid = people.playerid) >= 10
+--players had atleast 1 home run in 2016
+AND b.hr >=1
+--players career hit highest (hr) in 2016
+AND b.hr = (
+        SELECT MAX(hr)
+        FROM batting
+        WHERE playerid = b.playerid
+		AND b.yearid = 2016	
+    )
+GROUP BY people.namefirst,people.namelast,b.hr
+ ORDER BY hr_high DESC
+
+ 
 --Group Answer
 WITH tsn_managers AS (
 SELECT playerid, yearid, lgid
@@ -366,6 +426,38 @@ ORDER BY namefirst
 -- (played in the league 10+ years
 -- (hit at least 1 home run in 2016
 -- First name, Last name, Number of home runs they hit in 2016
+
+--Group Answer (revised)
+
+WITH player_career_high AS
+(
+    --Finding each player's career-high home runs
+    SELECT playerID, MAX(HR) AS MaxHR
+    FROM Batting
+    GROUP BY playerID
+),
+players_hit AS
+(
+    -- home runs for players in 2016 who hit their career high
+    SELECT b.playerID, b.HR AS hr_2016
+    FROM Batting b
+    JOIN player_career_high pch ON b.playerID = pch.playerID
+	AND b.HR = pch.MaxHR
+    WHERE b.yearID = 2016 AND b.HR > 0
+),
+decade_players AS
+(
+    -- players who have played at least 10 years
+    SELECT playerID
+    FROM Batting
+    GROUP BY playerID
+    HAVING COUNT(DISTINCT yearID) >= 10
+)
+SELECT concat(people.namefirst, ' ', people.namelast) AS full_name, p.playerID, p.hr_2016 AS home_runs_2016
+FROM players_hit p
+JOIN decade_players d ON p.playerID = d.playerID
+JOIN people ON p.playerID = people.playerID
+ORDER BY p.hr_2016 DESC;
 
 --Group answer
 WITH player_career_high AS (
